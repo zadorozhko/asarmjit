@@ -57,7 +57,7 @@ void arm_disasm(int machine)
             if (!((machine & ~(BLX_BIT|(COND_NV<<COND_SHIFT)|REG_MASK))^BX_BITS))
             {
                 strcpy(opname, (machine & BLX_BIT) ? "blx" : "bx");
-                sprintf(arg, "%s", regnames[machine&REG_MASK]);
+                snprintf(arg, sizeof(arg), "%s", regnames[machine&REG_MASK]);
                 break;
             }
             else if ((machine >> 7) & 0x1)
@@ -70,13 +70,13 @@ void arm_disasm(int machine)
                 int operand2 = (machine >> REG4_SHIFT) & REG_MASK;
                 int operand1 = (machine >> REG1_SHIFT) & REG_MASK;
 
-                sprintf(opname, "%s%s%s",
+                snprintf(opname, sizeof(opname), "%s%s%s",
                         multype ? "mla" : "mul",
                         cond != COND_AL ? condnames[cond] : "",
                         setcond ? "s" : ""
 
                         );
-                sprintf(arg, "%s, %s, %s%s%s",
+                snprintf(arg, sizeof(arg), "%s, %s, %s%s%s",
                         regnames[destreg],
                         regnames[operand1],
                         regnames[operand2],
@@ -109,9 +109,9 @@ void arm_disasm(int machine)
                 strcat(opname, "s");
 
             char op2immname[20];
-            sprintf(op2immname, "#0x%x", op2imm);
+            snprintf(op2immname,sizeof(op2immname), "#0x%x", op2imm);
 
-            sprintf(arg, "%s%s%s, %s",
+            snprintf(arg, sizeof(arg), "%s%s%s, %s",
                     (opcode < OP_TST || opcode > OP_CMN) ? regnames[destreg] : "",
                     ((opcode < OP_TST || opcode > OP_CMN) && opcode != OP_MOV && opcode != OP_MVN) ? ", " : "",
                     (opcode != OP_MOV && opcode != OP_MVN) ? regnames[operand2] : "",
@@ -124,8 +124,8 @@ void arm_disasm(int machine)
                 if (shiftbyreg)
                     strcpy(shiftarg, regnames[shiftreg]);
                 else
-                    sprintf(shiftarg, "#0x%x", shiftamt);
-                sprintf(shift, ", %s %s", shiftnames[shifttype], shiftarg);
+                    snprintf(shiftarg,sizeof(shiftarg), "#0x%x", shiftamt);
+                snprintf(shift, sizeof(shift),", %s %s", shiftnames[shifttype], shiftarg);
                 strcat(arg, shift);
             }
 
@@ -150,18 +150,18 @@ void arm_disasm(int machine)
 
             char myarg[20];
             if (imm)
-                sprintf(myarg, ", #%s0x%x", up ? "" : "-", immvalue);
+                snprintf(myarg, sizeof(myarg),", #%s0x%x", up ? "" : "-", immvalue);
             else
-                sprintf(myarg, ", %s%s%s", up ? "" : "-", regnames[offreg], "");
+                snprintf(myarg, sizeof(myarg),", %s%s%s", up ? "" : "-", regnames[offreg], "");
 
-            sprintf(opname, "%s%s%s",
+            snprintf(opname,sizeof(opname), "%s%s%s",
                     ls ? "ldr" : "str",
                     cond != COND_AL ? condnames[cond] : "",
                     byte ? "b" : ""
                     );
 
 
-            sprintf(arg, "%s, [%s%s]%s%s",
+            snprintf(arg, sizeof(arg),"%s, [%s%s]%s%s",
                     regnames[srcdst],
                     regnames[base],
                     pre ? (imm ? (immvalue ? myarg : "") : myarg) : "",
@@ -181,13 +181,13 @@ void arm_disasm(int machine)
             int base    = (machine >> REG3_SHIFT)& REG_MASK;
             int arglist = (machine & 0xffff);
 
-            sprintf(opname, "%s%s%s%s",
+            snprintf(opname,sizeof(opname), "%s%s%s%s",
                     ls ? "ldm" : "stm",
                     inc ? "i" : "d",
                     pre ? "b" : "a",
                     cond != COND_AL ? condnames[cond] : ""
                     );
-            sprintf(arg, "%s%s, {",
+            snprintf(arg,sizeof(arg), "%s%s, {",
                     regnames[base],
                     wb_mem ? "!" : ""
                     );
@@ -231,7 +231,7 @@ void arm_disasm(int machine)
 
             if (cond != COND_AL)
                 strcat(opname, condnames[cond]);
-            sprintf(arg, "0x%x", machine & B_MASK);
+            snprintf(arg,sizeof(arg), "0x%x", machine & B_MASK);
             break;
         case 6:
         {
@@ -239,14 +239,14 @@ void arm_disasm(int machine)
 
             if ((code&~(1|8)) == 16)
             {
-                sprintf(opname, "%s%s%s",
+                snprintf(opname, sizeof(opname), "%s%s%s",
                         (machine & LDRSTR_BIT) ? "fld" : "fst",
                         (machine & FDOUBLE_BIT) ? "d" : "s",
                         cond != COND_AL ? condnames[cond] : ""
                         );
                 int freg = ((machine >> REG2_SHIFT) & REG_MASK);
                 int areg = ((machine >> REG3_SHIFT) & REG_MASK);
-                sprintf(arg, "%s, [%s, #%s%d]",
+                snprintf(arg, sizeof(arg), "%s, [%s, #%s%d]",
                         (machine & FDOUBLE_BIT) ? dregnames[freg] : fregnames[freg *2 + ((machine>>FREG2_ODD_SHIFT)&1)],
                         regnames[areg],
                         (machine & (1 << 23)) ? "" : "-",
@@ -262,7 +262,7 @@ void arm_disasm(int machine)
             if (machine & FOP_TRANSFER_BIT)
             {
                 int vfptoarm = (machine >> FOPCODE_SHIFT) & 1;
-                sprintf(opname, "%s%s",
+                snprintf(opname, sizeof(opname), "%s%s",
                         vfptoarm ? "fmrs" : "fmsr",
                         cond == COND_AL ? "" :condnames[cond]
                         );
@@ -271,14 +271,14 @@ void arm_disasm(int machine)
 
                 if (machine & FDOUBLE_BIT)
                 {
-                    sprintf(arg, "%s, %s",
+                    snprintf(arg, sizeof(arg), "%s, %s",
                             vfptoarm ? regnames[src] : dregnames[dest],
                             vfptoarm ? dregnames[dest] : regnames[src]
                             );
                 }
                 else
                 {
-                    sprintf(arg, "%s, %s",
+                    snprintf(arg, sizeof(arg), "%s, %s",
                             vfptoarm ? regnames[src] : fregnames[dest*2 + ((machine >> FREG3_ODD_SHIFT)&1)],
                             vfptoarm ? fregnames[dest*2 + ((machine >> FREG3_ODD_SHIFT)&1)] : regnames[src]
                             );
@@ -289,7 +289,7 @@ void arm_disasm(int machine)
                 if (code < 9)
                 {
                     code |= ((machine & FSUB_BIT) >> (FSUB_SHIFT-2));
-                    sprintf(opname, "%s%s%s",
+                    snprintf(opname, sizeof(opname), "%s%s%s",
                             fmathopnames[code],
                             (machine & FDOUBLE_BIT) ? "d" : "s",
                             cond == COND_AL ? "" :condnames[cond]
@@ -300,7 +300,7 @@ void arm_disasm(int machine)
 
                     if (machine & FDOUBLE_BIT)
                     {
-                        sprintf(arg, "%s, %s, %s",
+                        snprintf(arg, sizeof(arg), "%s, %s, %s",
                                 dregnames[dest],
                                 dregnames[op1],
                                 dregnames[op2]
@@ -308,7 +308,7 @@ void arm_disasm(int machine)
                     }
                     else
                     {
-                        sprintf(arg, "%s, %s, %s",
+                        snprintf(arg, sizeof(arg), "%s, %s, %s",
                                 fregnames[dest*2 + ((machine >> FREG2_ODD_SHIFT)&1)],
                                 fregnames[op1 *2 + ((machine >> FREG3_ODD_SHIFT)&1)],
                                 fregnames[op2 *2 + ((machine >> FREG1_ODD_SHIFT)&1)]

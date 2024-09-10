@@ -4,6 +4,7 @@
 //
 // Implements an AngelScript to ARM machine code translator
 // Written by Fredrik Ehnbom in June-August 2009
+// Apple support by Ilia Zadorozhko Sep 2024
 
 #define AS_DEBUG 1
 #include "as_jit_arm.h"
@@ -21,13 +22,15 @@ BEGIN_AS_NAMESPACE
 #else
 #include <unistd.h>
 #include <sys/mman.h>
+#include <pthread.h>
+#include <libkern/OSCacheControl.h>
 #endif
 
 #include <assert.h>
 
 #define VERBOSE_DEBUG
 
-// TODO: don't hardcode this
+// TODO: don't hardcode this. Supported sizes are 4KB, 16KB, and 64KB.
 #define CODE_BLOCK_SIZE 4096
 
 
@@ -68,24 +71,39 @@ void asCJitArm::AddCode(int code)
     printf("        ; adding ");
     arm_disasm(code);
 #endif
+
     currMachine[currCodeOffset+codelen++] = code;
 }
 
 static void *CodeAlloc()
 {
-#ifdef _WIN32_WCE
-    return VirtualAlloc(NULL,
+#ifdef _WIN32_WCE 
+    auto ptr = VirtualAlloc(NULL,
                     CODE_BLOCK_SIZE,
                     MEM_COMMIT | MEM_RESERVE,
                     PAGE_EXECUTE_READWRITE);
-#else
-    return mmap(NULL,
+#endif
+#ifdef __APPLE__ // A/M series
+    void * ptr = mmap(NULL, 
+            CODE_BLOCK_SIZE,
+            PROT_READ | PROT_WRITE | PROT_EXEC,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT,
+            -1,
+            0);
+    pthread_jit_write_protect_np(0); // Make region writable, but not executable
+    sys_icache_invalidate(ptr, CODE_BLOCK_SIZE);
+#else   // Other Posix ARM
+    auto ptr = mmap(NULL,
             CODE_BLOCK_SIZE,
             PROT_READ | PROT_WRITE | PROT_EXEC,
             MAP_PRIVATE | MAP_ANON,
             -1,
             0);
 #endif
+    if(MAP_FAILED == ptr){
+        printf("Oh dear, something went wrong with mmap(): %s\n", strerror(errno));
+        exit(1);
+    } else return ptr;
 }
 
 static void CodeFree(void *mem)
@@ -126,6 +144,7 @@ void asCJitArm::SplitIntoBlocks(const asDWORD* bytecode, int bytecodeLen)
             case asBC_JNS:
             case asBC_JP:
             case asBC_JNP:
+            case asBC_CALL:
             {
                 int arg = asBC_INTARG(&bytecode[i]);
                 int start = i;
@@ -886,12 +905,20 @@ int asCJitArm::CompileFunction(asIScriptFunction *func, asJITFunction *output)
                     AddCode(arm_b(COND_EQ, (bytecodePos+size+target)*4, REVISIT_JUMP_BIT));
                     break;
                 }
+                case asBC_JS:
+                {
+                    int target = asBC_INTARG(bytecode);
+                    int reg = currBlock->GetNative(AS_REGISTER1);
+                    AddCode(arm_mov(COND_AL, reg, reg, SETCOND_BIT));
+                    currBlock->Flush();
+                    AddCode(arm_b(COND_MI, (bytecodePos+size+target)*4, REVISIT_JUMP_BIT));
+                    break;
+                }
                 case asBC_JMP:
                 {
                     int target = asBC_INTARG(bytecode);
                     currBlock->Flush();
                     AddCode(arm_b(COND_AL, (bytecodePos+size+target)*4, REVISIT_JUMP_BIT));
-
                     break;
                 }
                 case asBC_IncVi:
@@ -1009,6 +1036,7 @@ int asCJitArm::CompileFunction(asIScriptFunction *func, asJITFunction *output)
                     asBC_SWORDARG0(bytecode) = currBlock->nativeOffset;
                     break;
                 }
+                 
                 case asBC_RET:
                 {
                     implementedInstructionSize -= size;
@@ -1016,23 +1044,24 @@ int asCJitArm::CompileFunction(asIScriptFunction *func, asJITFunction *output)
                     AddCode(arm_b(COND_AL, (bytecodeLen+1)*4, REVISIT_JUMP_BIT));
                     break;
                 }
-
+                case asBC_CALL:
                 default:
                     // currBlock->hasUnimplementedBytecode = true;
                     printf("888888888888888888888888888888888888888888888\n");
                     printf("UNIMPLEMENTED BYTECODE\n");
+                    printf(" opcode: 0x%.8X\n",opcode);
+                    printf(" bytecode: 0x%.8X\n",bytecode);
                     printf("888888888888888888888888888888888888888888888\n");
                     //if (currCodeOffset+codelen-prologueLen == currBlock->nativeOffset)
                     //{
                     //    currBlock->hasUnimplementedBytecode = true;
                     //}
 
-                    // Unimplemented instruction. Flush native code
+                    // Unimplemented instruction. Flush native code with asBC_RET
                     implementedInstructionSize -= size;
                     currBlock->Return();
                     AddCode(arm_b(COND_AL, bytecodeLen*4, REVISIT_JUMP_BIT));
                     break;
-
             }
         }
 

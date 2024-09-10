@@ -1,10 +1,10 @@
-ASDIR = ${HOME}/code/3rdparty/angelscript
-CXXFLAGS = -arch i386 -g -Wall -I${ASDIR}/sdk/angelscript/include -Iarmjit
+ASDIR = ${HOME}/Work/SimulIDE-dev/src/angel
+CXXFLAGS = -arch arm64 -mcpu=apple-m1 -g -Wall -I${ASDIR}/include -Iarmjit
 LD = ld
-LDFLAGS = -arch i386 -lstdc++ -L${ASDIR}/sdk/angelscript/lib -langelscript
+LDFLAGS = -arch arm64 -lstdc++ -L${ASDIR}/lib -langelscript
 DELETER = rm -f
 
-OBJDIR = ipod
+OBJDIR = objs
 SRCNAMES = \
 	armjit/block.cpp \
 	armjit/registermanager.cpp \
@@ -13,13 +13,13 @@ SRCNAMES = \
 	armjit/vfpregistermanager.cpp \
 	armjit/as_jit_arm.cpp \
 	armjit/as_jit_arm_op.cpp \
-	test.cpp utils.cpp
+	asjit.cpp utils.cpp
 SRCDIR = ./
 
 OBJ = $(SRCNAMES:.cpp=.o)
 
 
-BIN = asjittest
+BIN = asjit
 
 all: $(BIN)
 

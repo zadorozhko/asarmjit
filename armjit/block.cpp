@@ -92,7 +92,7 @@ void Block::UpdateBC()
             pos-= asCByteCode::SizeOfType(BCT_SUSPEND);
         }
 */
-        jit->AddCode(arm_ldr(COND_AL, bc_reg, REG_PC, jit->AddData((int) (&jit->bytecode[pos])), PRE_BIT|IMM_BIT));
+        jit->AddCode(arm_ldr(COND_AL, bc_reg, REG_PC, jit->AddData((uintptr_t)(&jit->bytecode[pos])), PRE_BIT|IMM_BIT));
         jit->AddCode(arm_str(COND_AL, bc_reg, REG_R0, offsetof(asSVMRegisters, programPointer), PRE_BIT|IMM_BIT));
         jit->registerManager->FreeRegister(bc_reg);
     //}
